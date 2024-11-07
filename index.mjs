@@ -8,7 +8,8 @@ const dbConfig = {
   password: process.env.DB_PASSWORD,
   database: process.env.DB_NAME,
 };
-
+const slackToken = process.env.SLACK_BOT_TOKEN; // SlackのBot User OAuth Token
+const channelId = "api"; // SlackのチャンネルID
 // Lambdaハンドラ関数
 export const handler = async (event) => {
   console.log("Received event:", JSON.stringify(event)); // ログにイベントを記録
@@ -29,6 +30,22 @@ export const handler = async (event) => {
       [deviceMac]
     );
     const boxsId = rows[0]?.boxs_id;
+    const isLock = rows[0]?.is_lock;
+    const message = isLock === 1 ? "鍵を閉めています。" : "鍵を開けています。";
+    const response = await axios.post(
+      "https://slack.com/api/chat.postMessage",
+      {
+        channel: channelId,
+        text: message,
+        as_user: true,
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${slackToken}`,
+          "Content-Type": "application/json",
+        },
+      }
+    );
 
     if (boxsId) {
       // 取得したboxs_idを使用してboxsテーブルを更新
