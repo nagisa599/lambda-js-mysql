@@ -1,6 +1,6 @@
 // MySQLライブラリをインポート
 import mysql from "mysql2/promise";
-
+import axios from "axios";
 // データベース接続設定
 const dbConfig = {
   host: process.env.DB_HOST,
@@ -26,12 +26,14 @@ export const handler = async (event) => {
     const connection = await mysql.createConnection(dbConfig); // DB接続
     // 最初のboxs_on_keysレコードを検索
     const [rows] = await connection.execute(
-      "SELECT boxs_id FROM boxs_on_keys WHERE keys_id = ? LIMIT 1",
+      "SELECT (SELECT is_lock FROM boxs WHERE id = boxs_on_keys.boxs_id) AS is_lock, boxs_id FROM boxs_on_keys WHERE keys_id = ? LIMIT 1",
       [deviceMac]
     );
     const boxsId = rows[0]?.boxs_id;
     const isLock = rows[0]?.is_lock;
-    const message = isLock === 1 ? "鍵を閉めています。" : "鍵を開けています。";
+    console.log(rows[0]);
+    console.log("isLock",isLock);
+    const message = isLock === 1 ? `unlock${boxsId}` : `lock${boxsId}`;
     const response = await axios.post(
       "https://slack.com/api/chat.postMessage",
       {
@@ -49,7 +51,7 @@ export const handler = async (event) => {
 
     if (boxsId) {
       // 取得したboxs_idを使用してboxsテーブルを更新
-      if (powerState === "ON") {
+      if (isLock === 1) {
         await connection.execute("UPDATE boxs SET is_lock = 0 WHERE id = ?", [
           boxsId,
         ]);
